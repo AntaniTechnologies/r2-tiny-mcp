@@ -15,6 +15,9 @@ files persist across calls, so the model can build up state incrementally (e.g.
 Configuration (CLI flags, or environment variables):
   --url / R2_URL          radare2 HTTP endpoint (default http://127.0.0.1:9090/cmd/)
   --timeout / R2_TIMEOUT  per-command timeout in seconds (default 60)
+  
+ Copyright (C) Antani Technologies BV 2026. Distributed under MIT license.
+  
 """
 
 import argparse
