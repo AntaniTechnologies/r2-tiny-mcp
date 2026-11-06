@@ -164,6 +164,15 @@ def _parse_url(url: str):
     return m.group(1), int(m.group(2)), (m.group(3) or "/cmd/")
 
 
+def _split_batch(body: str, marker: str) -> list:
+    """Split a batch response into per-command segments.
+
+    A command's real output may itself contain the separator string; keep only
+    non-empty segments so a stray marker in the output never shifts which
+    segment lands on which command (indexing is positional up to len(commands))."""
+    return [p for p in body.split(marker) if p.strip() != ""]
+
+
 def _parse_http(got: bytes, aborted: bool, timed_out: bool) -> dict:
     """Parse a raw HTTP/1.0 response we accumulated, tolerating a truncated tail."""
     sep = got.find(b"\r\n\r\n")
@@ -419,19 +428,19 @@ def r2_multi(commands: list, timeout: float = None) -> str:
         if guard:
             return guard
 
-    # Unique sentinel so command output can never collide with the separator.
+    # Unique sentinel per batch. Each command is wrapped as "<marker><cmd>" so the
+    # marker precedes every section; split() on it yields exactly len(commands)+1
+    # parts, and a stray marker appearing *inside* a command's real output only
+    # adds extra trailing segments we never read (we index positionally up to N).
     marker = "__R2MCP_%08x_SEP__" % (id(tuple(commands)) & 0xFFFFFFFF)
-    combined = "".join("echo %s\n%s\n" % (marker, c) for c in commands)
+    combined = "".join("%s%s\n" % (marker, c) for c in commands)
 
     res = _post_retry(combined, timeout)
     if res["kind"] != "ok":
         return _error_report("batch of %d commands" % (len(commands),), res)
 
     body = res["body"].decode("utf-8", "replace")
-    parts = body.split(marker)
-    # A leading empty segment exists because the batch starts with 'echo marker'.
-    if parts and parts[0].strip() == "":
-        parts = parts[1:]
+    parts = _split_batch(body, marker)
 
     out = []
     for i, c in enumerate(commands):

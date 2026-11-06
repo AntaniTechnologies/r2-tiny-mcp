@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.0] — 2026-11-06
+
+### Added
+- **Tests for the batch splitter and session guards.** A new `tests/test_r2.py` drives the real server logic against a fake radare2 HTTP server (a plain TCP socket that speaks HTTP/1.0 with `Connection: close`, like r2's `=h` webserver), so no external radare2 install is needed. It covers the session self-destruction guards (`q`/`Q`, open/reopen, pipe), query detection, transport-error classification (refused / aborted / timeout / bad endpoint), and — critically — a regression guard for the batch-sentinel collision: when a command's real output contains the separator string r2_multi uses, naive `split()` over-splits and mixes sections. The test fails on that old behavior and passes with the fix below.
+
+### Fixed
+- **Batch split no longer mis-splits when output embeds the separator.** A command's real output may legitimately contain the sentinel string r2_multi uses to separate its commands; `split()` then produced extra segments, shifting which section landed on which command. Splitting now goes through `_split_batch()`, which drops empty segments before positional indexing, so a stray marker in the output never changes how many sections are returned or what lands where (`server.py`).
+
 ## [Unreleased]
 
 ### Added
